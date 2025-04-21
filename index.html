@@ -12,6 +12,7 @@
             align-items: center;
             min-height: 100vh;
             background: #f0f2f5;
+            touch-action: manipulation; /* Добавлено для мобильных устройств */
         }
         .color-wheel {
             width: 300px;
@@ -26,15 +27,10 @@
             );
             cursor: pointer;
             position: relative;
+            overflow: hidden; /* Добавлено для корректного определения кликов */
         }
         .cursor {
-            width: 20px;
-            height: 20px;
-            border: 2px solid white;
-            border-radius: 50%;
-            position: absolute;
-            pointer-events: none;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            /* ... предыдущие стилы ... */
         }
     </style>
 </head>
@@ -44,45 +40,50 @@
     </div>
 
     <script>
-        Telegram.WebApp.ready();
-        
+        // Инициализация WebApp
+        try {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+            console.log('WebApp initialized');
+        } catch (e) {
+            console.error('WebApp init error:', e);
+        }
+
         const wheel = document.getElementById('colorWheel');
         const cursor = document.getElementById('cursor');
-        let selectedColor = '#FFFFFF';
+        let isDragging = false;
 
-        function getColorAtPosition(x, y) {
+        function getColor(e) {
             const rect = wheel.getBoundingClientRect();
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI + 180;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const angle = Math.atan2(y - rect.height/2, x - rect.width/2) * 180 / Math.PI + 180;
             return `hsl(${angle}, 100%, 50%)`;
         }
 
-        function handleClick(e) {
-                const rect = wheel.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                selectedColor = getColorAtPosition(x, y);
-                
-                // Добавляем проверку инициализации
-                if (Telegram.WebApp.initDataUnsafe.user) {
-                    Telegram.WebApp.sendData(selectedColor);
-                } else {
-                    alert('Ошибка инициализации WebApp!');
-                }
+        function handleInteractionStart(e) {
+            isDragging = true;
+            const event = e.type === 'touchstart' ? e.touches[0] : e;
+            updateCursor(event);
+            selectColor(event);
+        }
+
+        function handleInteractionMove(e) {
+            if (!isDragging) return;
+            const event = e.type === 'touchmove' ? e.touches[0] : e;
+            updateCursor(event);
+            selectColor(event);
+        }
+
+        function handleInteractionEnd() {
+            isDragging = false;
+            if (Telegram.WebApp.initDataUnsafe.user) {
+                Telegram.WebApp.sendData(selectedColor);
                 Telegram.WebApp.close();
             }
-        
-            // Инициализация с обработкой ошибок
-            try {
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
-            } catch (e) {
-                console.error('WebApp init error:', e);
-            }
+        }
 
-        function handleMove(e) {
+        function updateCursor(e) {
             const rect = wheel.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -90,9 +91,20 @@
             cursor.style.top = `${y - 10}px`;
         }
 
-        wheel.addEventListener('click', handleClick);
-        wheel.addEventListener('mousemove', handleMove);
-        wheel.addEventListener('touchmove', e => handleMove(e.touches[0]));
+        function selectColor(e) {
+            selectedColor = getColor(e);
+            console.log('Selected color:', selectedColor);
+        }
+
+        // Обработчики событий
+        wheel.addEventListener('mousedown', handleInteractionStart);
+        wheel.addEventListener('mousemove', handleInteractionMove);
+        wheel.addEventListener('mouseup', handleInteractionEnd);
+        wheel.addEventListener('mouseleave', handleInteractionEnd);
+        
+        wheel.addEventListener('touchstart', handleInteractionStart);
+        wheel.addEventListener('touchmove', handleInteractionMove);
+        wheel.addEventListener('touchend', handleInteractionEnd);
     </script>
 </body>
 </html>
