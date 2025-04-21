@@ -2,80 +2,137 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <title>Telegram Color Picker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             margin: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
             background: #ffffff;
+            min-height: 100vh;
+            box-sizing: border-box;
         }
+
         .color-preview {
-            width: 100px;
-            height: 100px;
+            width: 120px;
+            height: 120px;
             border-radius: 50%;
-            margin-bottom: 20px;
-            border: 3px solid #000;
+            margin: 20px 0;
+            border: 3px solid #333;
+            transition: background 0.3s;
         }
+
         .color-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
+            gap: 15px;
+            max-width: 300px;
         }
-        .color-square {
+
+        .color-item {
             width: 80px;
             height: 80px;
             border-radius: 15px;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid #eee;
         }
-        .color-square:active {
-            transform: scale(0.9);
+
+        .color-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .confirm-btn {
+            margin-top: 30px;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            background: #007bff;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .confirm-btn.visible {
+            opacity: 1;
         }
     </style>
 </head>
 <body>
     <div class="color-preview" id="colorPreview"></div>
     <div class="color-grid">
-        <div class="color-square" style="background: #FF0000" data-color="red"></div>
-        <div class="color-square" style="background: #00FF00" data-color="green"></div>
-        <div class="color-square" style="background: #0000FF" data-color="blue"></div>
-        <div class="color-square" style="background: #FFFF00" data-color="yellow"></div>
-        <div class="color-square" style="background: #FF00FF" data-color="magenta"></div>
-        <div class="color-square" style="background: #00FFFF" data-color="cyan"></div>
+        <div class="color-item" style="background: #FF0000" data-color="red"></div>
+        <div class="color-item" style="background: #00FF00" data-color="green"></div>
+        <div class="color-item" style="background: #0000FF" data-color="blue"></div>
+        <div class="color-item" style="background: #FFD700" data-color="gold"></div>
+        <div class="color-item" style="background: #800080" data-color="purple"></div>
+        <div class="color-item" style="background: #FFA500" data-color="orange"></div>
     </div>
+    <button class="confirm-btn" id="confirmBtn">Подтвердить выбор</button>
 
     <script>
         // Инициализация WebApp
-        try {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
-            Telegram.WebApp.enableClosingConfirmation();
-        } catch (e) {
-            alert('WebApp error: ' + e.message);
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                Telegram.WebApp.enableClosingConfirmation();
+                console.log('WebApp initialized:', Telegram.WebApp.initDataUnsafe);
+            } catch (e) {
+                console.error('WebApp init error:', e);
+                alert('Ошибка инициализации WebApp!');
+            }
 
-        const preview = document.getElementById('colorPreview');
-        const squares = document.querySelectorAll('.color-square');
-        let selectedColor = '';
-        
-        // Обработчики для цветовых квадратов
-        squares.forEach(square => {
-            square.addEventListener('click', () => {
-                selectedColor = square.dataset.color;
-                preview.style.background = square.style.background;
-                
-                // Показываем подтверждение перед отправкой
-                if (confirm(`Выбрать цвет ${selectedColor}?`)) {
-                    try {
-                        Telegram.WebApp.sendData(selectedColor);
-                        setTimeout(() => Telegram.WebApp.close(), 300);
-                    } catch (e) {
-                        alert('Ошибка отправки: ' + e.message);
-                    }
+            const colorItems = document.querySelectorAll('.color-item');
+            const preview = document.getElementById('colorPreview');
+            const confirmBtn = document.getElementById('confirmBtn');
+            let selectedColor = null;
+
+            // Обработка выбора цвета
+            colorItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    // Сбрасываем предыдущий выбор
+                    colorItems.forEach(i => i.style.border = '2px solid #eee');
+                    
+                    // Устанавливаем новый выбор
+                    item.style.border = '3px solid #000';
+                    selectedColor = item.dataset.color;
+                    preview.style.background = item.style.background;
+                    confirmBtn.classList.add('visible');
+                });
+            });
+
+            // Обработка подтверждения
+            confirmBtn.addEventListener('click', () => {
+                if (!selectedColor) {
+                    alert('Сначала выберите цвет!');
+                    return;
+                }
+
+                try {
+                    // Отправляем данные в формате JSON
+                    const data = {
+                        color: selectedColor,
+                        hex: document.querySelector(`[data-color="${selectedColor}"]`).style.background,
+                        timestamp: Date.now()
+                    };
+
+                    Telegram.WebApp.sendData(JSON.stringify(data));
+                    
+                    // Закрываем WebApp через 500мс
+                    setTimeout(() => {
+                        Telegram.WebApp.close();
+                    }, 500);
+
+                } catch (e) {
+                    console.error('Ошибка отправки:', e);
+                    alert('Ошибка: ' + e.message);
                 }
             });
         });
