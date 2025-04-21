@@ -59,14 +59,28 @@
         }
 
         function handleClick(e) {
-            const rect = wheel.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            selectedColor = getColorAtPosition(x, y);
-            Telegram.WebApp.sendData(selectedColor);
-            Telegram.WebApp.close();
-        }
+                const rect = wheel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                selectedColor = getColorAtPosition(x, y);
+                
+                // Добавляем проверку инициализации
+                if (Telegram.WebApp.initDataUnsafe.user) {
+                    Telegram.WebApp.sendData(selectedColor);
+                } else {
+                    alert('Ошибка инициализации WebApp!');
+                }
+                Telegram.WebApp.close();
+            }
+        
+            // Инициализация с обработкой ошибок
+            try {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+            } catch (e) {
+                console.error('WebApp init error:', e);
+            }
 
         function handleMove(e) {
             const rect = wheel.getBoundingClientRect();
