@@ -1,42 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Color Picker</title>
     <meta charset="utf-8">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             margin: 0;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
             min-height: 100vh;
-            background: #f0f2f5;
-            touch-action: manipulation; /* Добавлено для мобильных устройств */
+            background: #ffffff;
         }
-        .color-wheel {
-            width: 300px;
-            height: 300px;
+        .color-preview {
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
-            background: conic-gradient(
-                #ff0000, #ff8000, #ffff00,
-                #80ff00, #00ff00, #00ff80,
-                #00ffff, #0080ff, #0000ff,
-                #8000ff, #ff00ff, #ff0080,
-                #ff0000
-            );
-            cursor: pointer;
-            position: relative;
-            overflow: hidden; /* Добавлено для корректного определения кликов */
+            margin-bottom: 20px;
+            border: 3px solid #000;
         }
-        .cursor {
-            /* ... предыдущие стилы ... */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .color-square {
+            width: 80px;
+            height: 80px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .color-square:active {
+            transform: scale(0.9);
         }
     </style>
 </head>
 <body>
-    <div class="color-wheel" id="colorWheel">
-        <div class="cursor" id="cursor"></div>
+    <div class="color-preview" id="colorPreview"></div>
+    <div class="color-grid">
+        <div class="color-square" style="background: #FF0000" data-color="red"></div>
+        <div class="color-square" style="background: #00FF00" data-color="green"></div>
+        <div class="color-square" style="background: #0000FF" data-color="blue"></div>
+        <div class="color-square" style="background: #FFFF00" data-color="yellow"></div>
+        <div class="color-square" style="background: #FF00FF" data-color="magenta"></div>
+        <div class="color-square" style="background: #00FFFF" data-color="cyan"></div>
     </div>
 
     <script>
@@ -44,67 +53,32 @@
         try {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
-            console.log('WebApp initialized');
+            Telegram.WebApp.enableClosingConfirmation();
         } catch (e) {
-            console.error('WebApp init error:', e);
+            alert('WebApp error: ' + e.message);
         }
 
-        const wheel = document.getElementById('colorWheel');
-        const cursor = document.getElementById('cursor');
-        let isDragging = false;
-
-        function getColor(e) {
-            const rect = wheel.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const angle = Math.atan2(y - rect.height/2, x - rect.width/2) * 180 / Math.PI + 180;
-            return `hsl(${angle}, 100%, 50%)`;
-        }
-
-        function handleInteractionStart(e) {
-            isDragging = true;
-            const event = e.type === 'touchstart' ? e.touches[0] : e;
-            updateCursor(event);
-            selectColor(event);
-        }
-
-        function handleInteractionMove(e) {
-            if (!isDragging) return;
-            const event = e.type === 'touchmove' ? e.touches[0] : e;
-            updateCursor(event);
-            selectColor(event);
-        }
-
-        function handleInteractionEnd() {
-            isDragging = false;
-            if (Telegram.WebApp.initDataUnsafe.user) {
-                Telegram.WebApp.sendData(selectedColor);
-                Telegram.WebApp.close();
-            }
-        }
-
-        function updateCursor(e) {
-            const rect = wheel.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            cursor.style.left = `${x - 10}px`;
-            cursor.style.top = `${y - 10}px`;
-        }
-
-        function selectColor(e) {
-            selectedColor = getColor(e);
-            console.log('Selected color:', selectedColor);
-        }
-
-        // Обработчики событий
-        wheel.addEventListener('mousedown', handleInteractionStart);
-        wheel.addEventListener('mousemove', handleInteractionMove);
-        wheel.addEventListener('mouseup', handleInteractionEnd);
-        wheel.addEventListener('mouseleave', handleInteractionEnd);
+        const preview = document.getElementById('colorPreview');
+        const squares = document.querySelectorAll('.color-square');
+        let selectedColor = '';
         
-        wheel.addEventListener('touchstart', handleInteractionStart);
-        wheel.addEventListener('touchmove', handleInteractionMove);
-        wheel.addEventListener('touchend', handleInteractionEnd);
+        // Обработчики для цветовых квадратов
+        squares.forEach(square => {
+            square.addEventListener('click', () => {
+                selectedColor = square.dataset.color;
+                preview.style.background = square.style.background;
+                
+                // Показываем подтверждение перед отправкой
+                if (confirm(`Выбрать цвет ${selectedColor}?`)) {
+                    try {
+                        Telegram.WebApp.sendData(selectedColor);
+                        setTimeout(() => Telegram.WebApp.close(), 300);
+                    } catch (e) {
+                        alert('Ошибка отправки: ' + e.message);
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>
