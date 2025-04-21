@@ -77,30 +77,40 @@
     <button class="confirm-btn" id="confirmBtn">Подтвердить выбор</button>
 
     <script>
-        // Инициализация WebApp
         document.addEventListener('DOMContentLoaded', () => {
+            // Проверка инициализации WebApp
             try {
                 Telegram.WebApp.ready();
                 Telegram.WebApp.expand();
                 Telegram.WebApp.enableClosingConfirmation();
+
+                if (!Telegram.WebApp.initDataUnsafe.user) {
+                    Telegram.WebApp.showAlert('Ошибка: WebApp должен быть запущен через бота!');
+                    Telegram.WebApp.close();
+                    return;
+                }
+
                 console.log('WebApp initialized:', Telegram.WebApp.initDataUnsafe);
+
             } catch (e) {
-                console.error('WebApp init error:', e);
-                alert('Ошибка инициализации WebApp!');
+                console.error('Ошибка инициализации:', e);
+                Telegram.WebApp.showAlert('Критическая ошибка!');
+                Telegram.WebApp.close();
+                return;
             }
 
+            // Логика выбора цвета
             const colorItems = document.querySelectorAll('.color-item');
             const preview = document.getElementById('colorPreview');
             const confirmBtn = document.getElementById('confirmBtn');
             let selectedColor = null;
 
-            // Обработка выбора цвета
             colorItems.forEach(item => {
                 item.addEventListener('click', () => {
-                    // Сбрасываем предыдущий выбор
+                    // Сброс предыдущего выбора
                     colorItems.forEach(i => i.style.border = '2px solid #eee');
                     
-                    // Устанавливаем новый выбор
+                    // Установка нового выбора
                     item.style.border = '3px solid #000';
                     selectedColor = item.dataset.color;
                     preview.style.background = item.style.background;
@@ -111,28 +121,31 @@
             // Обработка подтверждения
             confirmBtn.addEventListener('click', () => {
                 if (!selectedColor) {
-                    alert('Сначала выберите цвет!');
+                    Telegram.WebApp.showAlert('Сначала выберите цвет!');
                     return;
                 }
 
                 try {
-                    // Отправляем данные в формате JSON
+                    // Формирование данных
+                    const hexColor = document.querySelector(`[data-color="${selectedColor}"]`).style.backgroundColor;
                     const data = {
                         color: selectedColor,
-                        hex: document.querySelector(`[data-color="${selectedColor}"]`).style.background,
+                        hex: hexColor,
                         timestamp: Date.now()
                     };
 
+                    // Отправка данных
                     Telegram.WebApp.sendData(JSON.stringify(data));
-                    
-                    // Закрываем WebApp через 500мс
+                    console.log('Данные отправлены:', data);
+
+                    // Закрытие WebApp с задержкой
                     setTimeout(() => {
                         Telegram.WebApp.close();
                     }, 500);
 
                 } catch (e) {
                     console.error('Ошибка отправки:', e);
-                    alert('Ошибка: ' + e.message);
+                    Telegram.WebApp.showAlert(`Ошибка: ${e.message}`);
                 }
             });
         });
