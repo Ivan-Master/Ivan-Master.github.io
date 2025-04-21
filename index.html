@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Color Picker</title>
+    <meta charset="utf-8">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+        }
+        .color-wheel {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #ff0000, #ff8000, #ffff00,
+                #80ff00, #00ff00, #00ff80,
+                #00ffff, #0080ff, #0000ff,
+                #8000ff, #ff00ff, #ff0080,
+                #ff0000
+            );
+            cursor: pointer;
+            position: relative;
+        }
+        .cursor {
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            position: absolute;
+            pointer-events: none;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="color-wheel" id="colorWheel">
+        <div class="cursor" id="cursor"></div>
+    </div>
+
+    <script>
+        Telegram.WebApp.ready();
+        
+        const wheel = document.getElementById('colorWheel');
+        const cursor = document.getElementById('cursor');
+        let selectedColor = '#FFFFFF';
+
+        function getColorAtPosition(x, y) {
+            const rect = wheel.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI + 180;
+            return `hsl(${angle}, 100%, 50%)`;
+        }
+
+        function handleClick(e) {
+            const rect = wheel.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            selectedColor = getColorAtPosition(x, y);
+            Telegram.WebApp.sendData(selectedColor);
+            Telegram.WebApp.close();
+        }
+
+        function handleMove(e) {
+            const rect = wheel.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            cursor.style.left = `${x - 10}px`;
+            cursor.style.top = `${y - 10}px`;
+        }
+
+        wheel.addEventListener('click', handleClick);
+        wheel.addEventListener('mousemove', handleMove);
+        wheel.addEventListener('touchmove', e => handleMove(e.touches[0]));
+    </script>
+</body>
+</html>
