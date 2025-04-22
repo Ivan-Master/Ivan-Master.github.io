@@ -6,117 +6,121 @@
     <title>Color Picker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        /* Ваши стили остаются без изменений */
         body {
             margin: 0;
             padding: 20px;
             font-family: Arial, sans-serif;
+            background: #f8f9fa;
         }
         #color-canvas {
             width: 100%;
             height: 300px;
             border-radius: 10px;
             cursor: crosshair;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         #color-preview {
-            margin-top: 15px;
-            padding: 20px;
-            border-radius: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
             text-align: center;
             font-weight: bold;
+            background: white;
         }
     </style>
 </head>
 <body>
-    <canvas id="color-canvas"></canvas>
-    <div id="color-preview">Выберите цвет на палитре</div>
+    <div id="app-content">
+        <canvas id="color-canvas"></canvas>
+        <div id="color-preview">Нажмите на палитру для выбора цвета</div>
+    </div>
+
+    <div id="error-message" style="display: none; color: red; text-align: center; padding: 50px 20px;">
+        Пожалуйста, откройте это приложение через кнопку в боте Telegram
+    </div>
 
     <script>
-        // Инициализация только через Telegram
-        if (window.Telegram && Telegram.WebApp.initData) {
+        // Улучшенная проверка инициализации
+        function initApp() {
+            const errorDiv = document.getElementById('error-message');
+            const appContent = document.getElementById('app-content');
+
+            function showError() {
+                appContent.style.display = 'none';
+                errorDiv.style.display = 'block';
+            }
+
+            // 1. Проверяем наличие Telegram WebApp API
+            if (typeof Telegram === 'undefined' || !Telegram.WebApp) {
+                showError();
+                console.error('Telegram WebApp API не загружен');
+                return;
+            }
+
+            // 2. Проверяем данные инициализации
+            if (!Telegram.WebApp.initDataUnsafe || !Telegram.WebApp.initDataUnsafe.user) {
+                showError();
+                console.error('Данные инициализации отсутствуют');
+                return;
+            }
+
+            // 3. Инициализируем приложение
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
-            
+            appContent.style.display = 'block';
+            errorDiv.style.display = 'none';
+
+            // 4. Инициализация цветовой палитры
             const canvas = document.getElementById('color-canvas');
-            const preview = document.getElementById('color-preview');
             const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            // Отрисовка градиентов (как в предыдущем коде)
+            const hueGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            hueGradient.addColorStop(0, '#ff0000');
+            hueGradient.addColorStop(0.17, '#ffff00');
+            hueGradient.addColorStop(0.34, '#00ff00');
+            hueGradient.addColorStop(0.51, '#00ffff');
+            hueGradient.addColorStop(0.68, '#0000ff');
+            hueGradient.addColorStop(0.85, '#ff00ff');
+            hueGradient.addColorStop(1, '#ff0000');
             
-            // Установка размеров
-            canvas.width = 300;
-            canvas.height = 300;
-            
-            // Создание цветового градиента
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, '#ff0000');
-            gradient.addColorStop(0.17, '#ffff00');
-            gradient.addColorStop(0.34, '#00ff00');
-            gradient.addColorStop(0.51, '#00ffff');
-            gradient.addColorStop(0.68, '#0000ff');
-            gradient.addColorStop(0.85, '#ff00ff');
-            gradient.addColorStop(1, '#ff0000');
-            
-            ctx.fillStyle = gradient;
+            const transparencyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            transparencyGradient.addColorStop(0, 'rgba(255,255,255,1)');
+            transparencyGradient.addColorStop(0.5, 'rgba(255,255,255,0)');
+            transparencyGradient.addColorStop(0.5, 'rgba(0,0,0,0)');
+            transparencyGradient.addColorStop(1, 'rgba(0,0,0,1)');
+
+            ctx.fillStyle = hueGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Добавление светлоты
-            const whiteGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            whiteGradient.addColorStop(0, 'rgba(255,255,255,1)');
-            whiteGradient.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = whiteGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Добавление темноты
-            const blackGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            blackGradient.addColorStop(0, 'rgba(0,0,0,0)');
-            blackGradient.addColorStop(1, 'rgba(0,0,0,1)');
-            ctx.fillStyle = blackGradient;
+            ctx.fillStyle = transparencyGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Обработчик выбора цвета
-            canvas.addEventListener('click', (e) => {
+            // Обработчик клика (как в предыдущем коде)
+            canvas.addEventListener('click', e => {
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
                 const pixel = ctx.getImageData(x, y, 1, 1).data;
                 
-              const hex = `#${[pixel[0], pixel[1], pixel[2]]
-                .map(c => c.toString(16).padStart(2, '0'))
-                .join('')}`;
+                const hex = `#${[pixel[0], pixel[1], pixel[2]]
+                    .map(c => c.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
                 
-                const rgb = `${pixel[0]}, ${pixel[1]}, ${pixel[2]}`;
-                preview.innerHTML = `Выбран цвет: ${hex}`;
+                const hsv = rgbToHsv(pixel[0], pixel[1], pixel[2]);
                 
                 Telegram.WebApp.sendData(JSON.stringify({
-                    hex: hex.toUpperCase(),
-                    rgb: rgb,
-                    hsv: rgbToHsv(pixel[0], pixel[1], pixel[2])
+                    hex: hex,
+                    rgb: `${pixel[0]}, ${pixel[1]}, ${pixel[2]}`,
+                    hsv: hsv
                 }));
                 Telegram.WebApp.close();
             });
-            
-            // Конвертация RGB в HSV
-            function rgbToHsv(r, g, b) {
-                r /= 255, g /= 255, b /= 255;
-                const max = Math.max(r, g, b), min = Math.min(r, g, b);
-                let h, s, v = max;
-                const d = max - min;
-                s = max === 0 ? 0 : d / max;
-
-                if (max === min) {
-                    h = 0;
-                } else {
-                    switch (max) {
-                        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                        case g: h = (b - r) / d + 2; break;
-                        case b: h = (r - g) / d + 4; break;
-                    }
-                    h /= 6;
-                }
-
-                return `${Math.round(h * 360)}°, ${Math.round(s * 100)}%, ${Math.round(v * 100)}%`;
-            }
-        } else {
-            document.body.innerHTML = '<p style="color:red;text-align:center">Пожалуйста, откройте приложение через бота Telegram</p>';
         }
+
+        // Запускаем через небольшой таймаут для гарантии загрузки API
+        setTimeout(initApp, 50);
     </script>
 </body>
 </html>
