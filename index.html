@@ -10,88 +10,104 @@
             margin: 0;
             padding: 20px;
             font-family: Arial, sans-serif;
+            background: #f8f9fa;
         }
         #color-canvas {
             width: 100%;
             height: 300px;
             border-radius: 10px;
             cursor: crosshair;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         #color-preview {
-            margin-top: 15px;
-            padding: 20px;
-            border-radius: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
             text-align: center;
             font-weight: bold;
+            background: white;
         }
     </style>
 </head>
 <body>
     <canvas id="color-canvas"></canvas>
-    <div id="color-preview">Выберите цвет на палитре</div>
+    <div id="color-preview">Нажмите на палитру для выбора цвета</div>
 
     <script>
-        // Инициализация только через Telegram
+        // Проверка контекста Telegram
         if (window.Telegram && Telegram.WebApp.initData) {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
             
+            // Инициализация Canvas
             const canvas = document.getElementById('color-canvas');
-            const preview = document.getElementById('color-preview');
             const ctx = canvas.getContext('2d');
+            const preview = document.getElementById('color-preview');
             
             // Установка размеров
-            canvas.width = 300;
-            canvas.height = 300;
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
             
-            // Создание цветового градиента
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, '#ff0000');
-            gradient.addColorStop(0.17, '#ffff00');
-            gradient.addColorStop(0.34, '#00ff00');
-            gradient.addColorStop(0.51, '#00ffff');
-            gradient.addColorStop(0.68, '#0000ff');
-            gradient.addColorStop(0.85, '#ff00ff');
-            gradient.addColorStop(1, '#ff0000');
-            
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Добавление светлоты
-            const whiteGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            whiteGradient.addColorStop(0, 'rgba(255,255,255,1)');
-            whiteGradient.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = whiteGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Добавление темноты
-            const blackGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            blackGradient.addColorStop(0, 'rgba(0,0,0,0)');
-            blackGradient.addColorStop(1, 'rgba(0,0,0,1)');
-            ctx.fillStyle = blackGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Отрисовка палитры
+            function drawColorPalette() {
+                // Основной цветовой градиент
+                const hueGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                hueGradient.addColorStop(0, '#ff0000');
+                hueGradient.addColorStop(0.17, '#ffff00');
+                hueGradient.addColorStop(0.34, '#00ff00');
+                hueGradient.addColorStop(0.51, '#00ffff');
+                hueGradient.addColorStop(0.68, '#0000ff');
+                hueGradient.addColorStop(0.85, '#ff00ff');
+                hueGradient.addColorStop(1, '#ff0000');
+                
+                // Градиент прозрачности
+                const transparencyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                transparencyGradient.addColorStop(0, 'rgba(255,255,255,1)');
+                transparencyGradient.addColorStop(0.5, 'rgba(255,255,255,0)');
+                transparencyGradient.addColorStop(0.5, 'rgba(0,0,0,0)');
+                transparencyGradient.addColorStop(1, 'rgba(0,0,0,1)');
 
-            // Обработчик выбора цвета
-            canvas.addEventListener('click', (e) => {
+                // Отрисовка
+                ctx.fillStyle = hueGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = transparencyGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Обработчик клика
+            function handleCanvasClick(e) {
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
+                
+                // Получение цвета пикселя
                 const pixel = ctx.getImageData(x, y, 1, 1).data;
+                const [r, g, b] = pixel;
                 
-                const hex = `#${[pixel[0], pixel[1], pixel[2]]
-                    .map(c => c.toString(16).padStart(2, '0').join('')}`;
+                // Конвертация в HEX
+                const hex = `#${[r, g, b].map(c => 
+                    c.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
                 
-                const rgb = `${pixel[0]}, ${pixel[1]}, ${pixel[2]}`;
-                preview.innerHTML = `Выбран цвет: ${hex}`;
+                // Конвертация в HSV
+                const hsv = rgbToHsv(r, g, b);
                 
+                // Обновление превью
+                preview.innerHTML = `
+                    HEX: ${hex}<br>
+                    RGB: ${r}, ${g}, ${b}<br>
+                    HSV: ${hsv}
+                `;
+                preview.style.backgroundColor = hex;
+                
+                // Отправка данных
                 Telegram.WebApp.sendData(JSON.stringify({
-                    hex: hex.toUpperCase(),
-                    rgb: rgb,
-                    hsv: rgbToHsv(pixel[0], pixel[1], pixel[2])
+                    hex: hex,
+                    rgb: `${r}, ${g}, ${b}`,
+                    hsv: hsv
                 }));
                 Telegram.WebApp.close();
-            });
-            
+            }
+
             // Конвертация RGB в HSV
             function rgbToHsv(r, g, b) {
                 r /= 255, g /= 255, b /= 255;
@@ -103,7 +119,7 @@
                 if (max === min) {
                     h = 0;
                 } else {
-                    switch (max) {
+                    switch(max) {
                         case r: h = (g - b) / d + (g < b ? 6 : 0); break;
                         case g: h = (b - r) / d + 2; break;
                         case b: h = (r - g) / d + 4; break;
@@ -113,8 +129,17 @@
 
                 return `${Math.round(h * 360)}°, ${Math.round(s * 100)}%, ${Math.round(v * 100)}%`;
             }
+
+            // Инициализация
+            drawColorPalette();
+            canvas.addEventListener('click', handleCanvasClick);
+            
         } else {
-            document.body.innerHTML = '<p style="color:red;text-align:center">Пожалуйста, откройте приложение через бота Telegram</p>';
+            document.body.innerHTML = `
+                <div style="color: red; text-align: center; padding: 50px 20px;">
+                    Пожалуйста, откройте это приложение через кнопку в боте Telegram
+                </div>
+            `;
         }
     </script>
 </body>
