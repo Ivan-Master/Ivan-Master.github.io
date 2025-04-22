@@ -33,6 +33,7 @@
             text-align: center;
         }
         #error-message {
+            display: none;
             color: red;
             text-align: center;
             padding: 20px;
@@ -47,30 +48,36 @@
             <p>Нажмите на палитру для выбора цвета</p>
         </div>
     </div>
+
     <div id="error-message">
         Пожалуйста, откройте это приложение через кнопку в боте Telegram
     </div>
 
     <script>
         // Проверка контекста Telegram
-        if (window.Telegram && Telegram.WebApp.initData) {
-            document.getElementById('content').style.display = 'block';
-            document.getElementById('error-message').style.display = 'none';
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                document.getElementById('content').style.display = 'block';
+                document.getElementById('error-message').style.display = 'none';
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                initializeColorPicker();
+            } else {
+                document.getElementById('content').style.display = 'none';
+                document.getElementById('error-message').style.display = 'block';
+            }
+        });
 
-        // Инициализация Canvas
-        const canvas = document.getElementById('color-canvas');
-        const ctx = canvas.getContext('2d');
-        const preview = document.getElementById('color-preview');
-        
-        // Установка размеров
-        canvas.width = 300;
-        canvas.height = 300;
-        
-        // Создание цветового градиента
-        function createColorGradient() {
+        function initializeColorPicker() {
+            const canvas = document.getElementById('color-canvas');
+            const ctx = canvas.getContext('2d');
+            const preview = document.getElementById('color-preview');
+            
+            // Установка размеров
+            canvas.width = 300;
+            canvas.height = 300;
+            
+            // Создание цветового градиента
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
             gradient.addColorStop(0, '#FF0000');
             gradient.addColorStop(0.17, '#FFFF00');
@@ -94,70 +101,59 @@
             blackGradient.addColorStop(1, 'rgba(0,0,0,1)');
             ctx.fillStyle = blackGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
 
-        // Конвертация HSV в RGB
-        function hsvToRgb(h, s, v) {
-            h /= 360;
-            s /= 100;
-            v /= 100;
-            
-            let r, g, b;
-            const i = Math.floor(h * 6);
-            const f = h * 6 - i;
-            const p = v * (1 - s);
-            const q = v * (1 - f * s);
-            const t = v * (1 - (1 - f) * s);
-
-            switch (i % 6) {
-                case 0: r = v, g = t, b = p; break;
-                case 1: r = q, g = v, b = p; break;
-                case 2: r = p, g = v, b = t; break;
-                case 3: r = p, g = q, b = v; break;
-                case 4: r = t, g = p, b = v; break;
-                case 5: r = v, g = p, b = q; break;
-            }
-
-            return [
-                Math.round(r * 255),
-                Math.round(g * 255),
-                Math.round(b * 255)
-            ];
-        }
-
-        // Получение цвета из координат
-        function getColor(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const h = (x / canvas.width) * 360;
-            const s = 100 - (y / canvas.height) * 100;
-            const v = 100;
-            
-            const rgb = hsvToRgb(h, s, v);
-            const hex = '#' + rgb.map(c => c.toString(16).padStart(2, '0')).join('');
-            
-            return {
-                hex: hex.toUpperCase(),
-                rgb: rgb.join(', '),
-                hsv: `${Math.round(h)}°, ${Math.round(s)}%, ${Math.round(v)}%`
-            };
-        }
-
-        // Обработчик клика
-        canvas.addEventListener('click', (e) => {
-            const color = getColor(e);
-            preview.style.backgroundColor = color.hex;
-            
-            if (Telegram.WebApp.initData) {
-                Telegram.WebApp.sendData(JSON.stringify(color));
+            // Обработчик клика
+            canvas.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const h = (x / canvas.width) * 360;
+                const s = 100 - (y / canvas.height) * 100;
+                const v = 100;
+                
+                const rgb = hsvToRgb(h, s, v);
+                const hex = '#' + rgb.map(c => c.toString(16).padStart(2, '0')).join('').toUpperCase();
+                
+                preview.style.backgroundColor = hex;
+                
+                Telegram.WebApp.sendData(JSON.stringify({
+                    hex: hex,
+                    rgb: `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`,
+                    hsv: `${Math.round(h)}°, ${Math.round(s)}%, ${Math.round(v)}%`
+                }));
                 Telegram.WebApp.close();
-            }
-        });
+            });
 
-        // Инициализация
-        createColorGradient();
+            // Конвертация HSV в RGB
+            function hsvToRgb(h, s, v) {
+                h /= 360;
+                s /= 100;
+                v /= 100;
+                
+                let r, g, b;
+                const i = Math.floor(h * 6);
+                const f = h * 6 - i;
+                const p = v * (1 - s);
+                const q = v * (1 - f * s);
+                const t = v * (1 - (1 - f) * s);
+
+                switch (i % 6) {
+                    case 0: r = v, g = t, b = p; break;
+                    case 1: r = q, g = v, b = p; break;
+                    case 2: r = p, g = v, b = t; break;
+                    case 3: r = p, g = q, b = v; break;
+                    case 4: r = t, g = p, b = v; break;
+                    case 5: r = v, g = p, b = q; break;
+                }
+
+                return [
+                    Math.round(r * 255),
+                    Math.round(g * 255),
+                    Math.round(b * 255)
+                ];
+            }
+        }
     </script>
 </body>
 </html>
