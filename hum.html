@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Control</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        .chart-container { margin-top: 20px; height: 200px; }
+        button { margin-top: 15px; padding: 10px 20px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Управление дисплеем</h1>
+    
+    <div>
+        <label class="switch">
+            <input type="checkbox" id="displayToggle">
+            <span class="slider"></span>
+        </label>
+        <span id="displayStatus">Состояние: загрузка...</span>
+    </div>
+    
+    <h2>Температура</h2>
+    <div class="chart-container">
+        <canvas id="tempChart"></canvas>
+    </div>
+    
+    <h2>Влажность</h2>
+    <div class="chart-container">
+        <canvas id="humChart"></canvas>
+    </div>
+    
+    <button id="saveBtn">Сохранить</button>
+
+    <script>
+        // Инициализация Firebase
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT.firebasedatabase.app",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        
+        // Инициализация Telegram WebApp
+        const webApp = Telegram.WebApp;
+        webApp.ready();
+        
+        // Элементы DOM
+        const displayToggle = document.getElementById('displayToggle');
+        const displayStatus = document.getElementById('displayStatus');
+        const saveBtn = document.getElementById('saveBtn');
+        
+        // Графики
+        const tempCtx = document.getElementById('tempChart').getContext('2d');
+        const humCtx = document.getElementById('humChart').getContext('2d');
+        
+        let tempChart, humChart;
+        let displayState = false;
+        let chartData = {
+            temperature: { min: 0, max: 0, avg: 0, data: [] },
+            humidity: { min: 0, max: 0, avg: 0, data: [] }
+        };
+        
+        // Загрузка данных
+        async function loadData() {
+            try {
+                const response = await fetch('YOUR_BOT_WEBHOOK/get_chart_data');
+                const data = await response.json();
+                
+                chartData = data;
+                displayState = data.displayState;
+                
+                displayToggle.checked = displayState;
+                displayStatus.textContent = `Состояние: ${displayState ? 'ВКЛ' : 'ВЫКЛ'}`;
+                
+                renderCharts();
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+        
+        // Отрисовка графиков
+        function renderCharts() {
+            // Уничтожаем старые графики
+            if (tempChart) tempChart.destroy();
+            if (humChart) humChart.destroy();
+            
+            // Конфигурация графиков
+            const chartConfig = (data, label, color) => ({
+                type: 'line',
+                data: {
+                    labels: data.data.map(item => item.time.split(' ')[1]),
+                    datasets: [{
+                        label: label,
+                        data: data.data.map(item => item.value),
+                        borderColor: color,
+                        tension: 0.3,
+                        fill: false
+                    }, {
+                        label: 'Средняя',
+                        data: Array(data.data.length).fill(data.avg),
+                        borderColor: 'green',
+                        borderDash: [5, 5],
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0
+                    }, {
+                        label: 'Макс',
+                        data: Array(data.data.length).fill(data.max),
+                        borderColor: 'red',
+                        borderDash: [5, 5],
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0
+                    }, {
+                        label: 'Мин',
+                        data: Array(data.data.length).fill(data.min),
+                        borderColor: 'blue',
+                        borderDash: [5, 5],
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+            
+            // Создаем новые графики
+            tempChart = new Chart(tempCtx, chartConfig(
+                chartData.temperature, 
+                'Температура (°C)', 
+                'rgba(255, 99, 132, 1)'
+            ));
+            
+            humChart = new Chart(humCtx, chartConfig(
+                chartData.humidity, 
+                'Влажность (%)', 
+                'rgba(54, 162, 235, 1)'
+            ));
+        }
+        
+        // Обработчики событий
+        displayToggle.addEventListener('change', () => {
+            displayState = displayToggle.checked;
+            displayStatus.textContent = `Состояние: ${displayState ? 'ВКЛ' : 'ВЫКЛ'}`;
+        });
+        
+        saveBtn.addEventListener('click', () => {
+            webApp.sendData(JSON.stringify({
+                displayState: displayState
+            }));
+            webApp.close();
+        });
+        
+        // Инициализация
+        loadData();
+    </script>
+</body>
+</html>
