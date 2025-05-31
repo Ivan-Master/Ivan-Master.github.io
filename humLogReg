@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0b7dda;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            background: #f1f1f1;
+        }
+        .tab.active {
+            background: #2196F3;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Авторизация</h1>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('login')">Вход</div>
+            <div class="tab" onclick="showTab('register')">Регистрация</div>
+        </div>
+
+        <!-- Форма входа -->
+        <div id="login-form">
+            <div class="form-group">
+                <label for="login-username">Логин</label>
+                <input type="text" id="login-username" placeholder="Введите логин">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Пароль</label>
+                <input type="password" id="login-password" placeholder="Введите пароль">
+            </div>
+            <button onclick="login()">Войти</button>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div id="register-form" style="display: none;">
+            <div class="form-group">
+                <label for="reg-username">Логин</label>
+                <input type="text" id="reg-username" placeholder="Придумайте логин">
+            </div>
+            <div class="form-group">
+                <label for="reg-password">Пароль</label>
+                <input type="password" id="reg-password" placeholder="Придумайте пароль">
+            </div>
+            <div class="form-group">
+                <label for="reg-code">Кодовое слово</label>
+                <input type="password" id="reg-code" placeholder="Введите кодовое слово">
+            </div>
+            <button onclick="register()">Зарегистрироваться</button>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram WebApp
+        const webApp = Telegram.WebApp;
+        webApp.ready();
+        webApp.expand();
+
+        // Переключение между вкладками
+        function showTab(tabName) {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'none';
+
+            document.getElementById(tabName + '-form').style.display = 'block';
+
+            // Обновляем активную вкладку
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // Функция входа
+        function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                alert('Пожалуйста, заполните все поля');
+                return;
+            }
+
+            // Отправляем данные боту
+            webApp.sendData(JSON.stringify({
+                action: 'login',
+                login: username,
+                password: password
+            }));
+
+            webApp.close();
+        }
+
+        // Функция регистрации
+        function register() {
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+            const code = document.getElementById('reg-code').value;
+
+            if (!username || !password || !code) {
+                alert('Пожалуйста, заполните все поля');
+                return;
+            }
+
+            // Отправляем данные боту
+            webApp.sendData(JSON.stringify({
+                action: 'register',
+                login: username,
+                password: password,
+                code: code
+            }));
+
+            webApp.close();
+        }
+    </script>
+</body>
+</html>
