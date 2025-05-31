@@ -6,60 +6,31 @@
     <title>Display Control</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #2196F3; }
-        input:checked + .slider:before { transform: translateX(26px); }
-        .chart-container { margin-top: 20px; height: 200px; }
-        button { margin-top: 15px; padding: 10px 20px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <h1>Управление дисплеем</h1>
-    
-    <div>
-        <label class="switch">
-            <input type="checkbox" id="displayToggle">
-            <span class="slider"></span>
-        </label>
-        <span id="displayStatus">Состояние: загрузка...</span>
-    </div>
-    
-    <h2>Температура</h2>
-    <div class="chart-container">
-        <canvas id="tempChart"></canvas>
-    </div>
-    
-    <h2>Влажность</h2>
-    <div class="chart-container">
-        <canvas id="humChart"></canvas>
-    </div>
-    
-    <button id="saveBtn">Сохранить</button>
+    <script type="module">
+        // Импорт Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, once } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
-    <script>
+        // Ваша конфигурация Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyB0ffMd9P4tYw-KVHM1_sMsqIglL-z6DFs",
+        authDomain: "humidity-master.firebaseapp.com",
+        databaseURL: "https://humidity-master-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "humidity-master",
+        storageBucket: "humidity-master.firebasestorage.app",
+        messagingSenderId: "593384546021",
+        appId: "1:593384546021:web:eea456e0824424af6a7e0c"
+      };
+
         // Инициализация Firebase
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT.firebasedatabase.app",
-            projectId: "YOUR_PROJECT",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        firebase.initializeApp(firebaseConfig);
-        
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
         // Инициализация Telegram WebApp
         const webApp = Telegram.WebApp;
         webApp.ready();
-        
+        webApp.expand(); // Раскрываем на весь экран
+
         // Элементы DOM
         const displayToggle = document.getElementById('displayToggle');
         const displayStatus = document.getElementById('displayStatus');
@@ -71,93 +42,171 @@
         
         let tempChart, humChart;
         let displayState = false;
-        let chartData = {
-            temperature: { min: 0, max: 0, avg: 0, data: [] },
-            humidity: { min: 0, max: 0, avg: 0, data: [] }
-        };
-        
+
         // Загрузка данных
         async function loadData() {
             try {
-                const response = await fetch('YOUR_BOT_WEBHOOK/get_chart_data');
-                const data = await response.json();
+                displayStatus.textContent = "Загрузка данных...";
                 
-                chartData = data;
-                displayState = data.displayState;
+                // Получаем состояние дисплея
+                const displayRef = ref(db, 'System/displayOnOff');
+                onValue(displayRef, (snapshot) => {
+                    const value = snapshot.val();
+                    displayState = value === "doo1";
+                    displayToggle.checked = displayState;
+                    displayStatus.textContent = `Состояние: ${displayState ? 'ВКЛ' : 'ВЫКЛ'}`;
+                });
                 
-                displayToggle.checked = displayState;
-                displayStatus.textContent = `Состояние: ${displayState ? 'ВКЛ' : 'ВЫКЛ'}`;
+                // Получаем индексы
+                const listIdRef = ref(db, 'ListId');
+                once(listIdRef).then((snapshot) => {
+                    const listId = snapshot.val();
+                    const lastHumIdx = listId.HI;
+                    const lastTempIdx = listId.TI;
+                    
+                    // Загрузка данных влажности
+                    loadSensorData('HumValue', lastHumIdx, 'hum', 'humChart', 'Влажность', '#36a2eb');
+                    
+                    // Загрузка данных температуры
+                    loadSensorData('TempValue', lastTempIdx, 'temp', 'tempChart', 'Температура', '#ff6384');
+                });
                 
-                renderCharts();
             } catch (error) {
                 console.error('Error loading data:', error);
+                displayStatus.textContent = "Ошибка загрузки данных";
             }
         }
         
-        // Отрисовка графиков
-        function renderCharts() {
-            // Уничтожаем старые графики
-            if (tempChart) tempChart.destroy();
-            if (humChart) humChart.destroy();
+        // Загрузка данных сенсора
+        async function loadSensorData(path, lastIdx, valueKey, chartId, label, color) {
+            try {
+                const data = [];
+                const startIdx = Math.max(1, lastIdx - 9);
+                
+                for (let i = startIdx; i <= lastIdx; i++) {
+                    const snapshot = await once(ref(db, `${path}/${i}`));
+                    if (snapshot.exists()) {
+                        const record = snapshot.val();
+                        data.push({
+                            value: record[valueKey],
+                            time: record.time
+                        });
+                    }
+                }
+                
+                // Рассчет статистики
+                const values = data.map(item => item.value);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                
+                // Обновление статистики
+                if (valueKey === 'temp') {
+                    document.getElementById('tempMin').textContent = min.toFixed(1);
+                    document.getElementById('tempMax').textContent = max.toFixed(1);
+                    document.getElementById('tempAvg').textContent = avg.toFixed(1);
+                } else {
+                    document.getElementById('humMin').textContent = min.toFixed(1);
+                    document.getElementById('humMax').textContent = max.toFixed(1);
+                    document.getElementById('humAvg').textContent = avg.toFixed(1);
+                }
+                
+                // Отрисовка графика
+                renderChart(chartId, data, label, color, min, max, avg);
+                
+            } catch (error) {
+                console.error(`Error loading ${path} data:`, error);
+            }
+        }
+        
+        // Отрисовка графика
+        function renderChart(canvasId, data, label, color, minVal, maxVal, avgVal) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
             
-            // Конфигурация графиков
-            const chartConfig = (data, label, color) => ({
+            // Уничтожаем старый график, если есть
+            if (canvasId === 'tempChart' && tempChart) tempChart.destroy();
+            if (canvasId === 'humChart' && humChart) humChart.destroy();
+            
+            // Форматирование времени (только часы:минуты)
+            const formatTime = (fullTime) => {
+                if (!fullTime) return '';
+                const timePart = fullTime.split(' ')[1];
+                return timePart.substring(0, 5); // Берем только HH:MM
+            };
+            
+            // Создаем новый график
+            const chart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.data.map(item => item.time.split(' ')[1]),
-                    datasets: [{
-                        label: label,
-                        data: data.data.map(item => item.value),
-                        borderColor: color,
-                        tension: 0.3,
-                        fill: false
-                    }, {
-                        label: 'Средняя',
-                        data: Array(data.data.length).fill(data.avg),
-                        borderColor: 'green',
-                        borderDash: [5, 5],
-                        borderWidth: 1,
-                        fill: false,
-                        pointRadius: 0
-                    }, {
-                        label: 'Макс',
-                        data: Array(data.data.length).fill(data.max),
-                        borderColor: 'red',
-                        borderDash: [5, 5],
-                        borderWidth: 1,
-                        fill: false,
-                        pointRadius: 0
-                    }, {
-                        label: 'Мин',
-                        data: Array(data.data.length).fill(data.min),
-                        borderColor: 'blue',
-                        borderDash: [5, 5],
-                        borderWidth: 1,
-                        fill: false,
-                        pointRadius: 0
-                    }]
+                    labels: data.map(item => formatTime(item.time)),
+                    datasets: [
+                        {
+                            label: label,
+                            data: data.map(item => item.value),
+                            borderColor: color,
+                            backgroundColor: color + '20',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: color
+                        },
+                        {
+                            label: 'Средняя',
+                            data: Array(data.length).fill(avgVal),
+                            borderColor: '#28a745',
+                            borderDash: [5, 5],
+                            borderWidth: 1,
+                            fill: false,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Максимум',
+                            data: Array(data.length).fill(maxVal),
+                            borderColor: '#dc3545',
+                            borderDash: [5, 5],
+                            borderWidth: 1,
+                            fill: false,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Минимум',
+                            data: Array(data.length).fill(minVal),
+                            borderColor: '#007bff',
+                            borderDash: [5, 5],
+                            borderWidth: 1,
+                            fill: false,
+                            pointRadius: 0
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
                     scales: {
-                        y: { beginAtZero: false }
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
                     }
                 }
             });
             
-            // Создаем новые графики
-            tempChart = new Chart(tempCtx, chartConfig(
-                chartData.temperature, 
-                'Температура (°C)', 
-                'rgba(255, 99, 132, 1)'
-            ));
-            
-            humChart = new Chart(humCtx, chartConfig(
-                chartData.humidity, 
-                'Влажность (%)', 
-                'rgba(54, 162, 235, 1)'
-            ));
+            // Сохраняем ссылку на график
+            if (canvasId === 'tempChart') tempChart = chart;
+            if (canvasId === 'humChart') humChart = chart;
         }
         
         // Обработчики событий
@@ -167,6 +216,7 @@
         });
         
         saveBtn.addEventListener('click', () => {
+            // Отправляем новое состояние дисплея боту
             webApp.sendData(JSON.stringify({
                 displayState: displayState
             }));
@@ -175,6 +225,154 @@
         
         // Инициализация
         loadData();
+        
+        // Обновляем данные каждые 30 секунд
+        setInterval(loadData, 30000);
     </script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .switch-container {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .switch { 
+            position: relative; 
+            display: inline-block; 
+            width: 60px; 
+            height: 34px; 
+            margin-right: 15px;
+        }
+        .switch input { 
+            opacity: 0; 
+            width: 0; 
+            height: 0; 
+        }
+        .slider { 
+            position: absolute; 
+            cursor: pointer; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            background-color: #ccc; 
+            transition: .4s; 
+            border-radius: 34px; 
+        }
+        .slider:before { 
+            position: absolute; 
+            content: ""; 
+            height: 26px; 
+            width: 26px; 
+            left: 4px; 
+            bottom: 4px; 
+            background-color: white; 
+            transition: .4s; 
+            border-radius: 50%; 
+        }
+        input:checked + .slider { 
+            background-color: #2196F3; 
+        }
+        input:checked + .slider:before { 
+            transform: translateX(26px); 
+        }
+        .chart-container { 
+            margin: 20px 0; 
+            height: 250px; 
+            position: relative;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 10px 0;
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        button { 
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px 20px; 
+            background: #2196F3; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0b7dda;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Управление дисплеем</h1>
+        
+        <div class="switch-container">
+            <label class="switch">
+                <input type="checkbox" id="displayToggle">
+                <span class="slider"></span>
+            </label>
+            <span id="displayStatus">Состояние: загрузка...</span>
+        </div>
+        
+        <h2>Температура (°C)</h2>
+        <div class="chart-container">
+            <canvas id="tempChart"></canvas>
+        </div>
+        <div class="stats" id="tempStats">
+            <div class="stat-item">Средняя: <span class="stat-value" id="tempAvg">-</span></div>
+            <div class="stat-item">Мин: <span class="stat-value" id="tempMin">-</span></div>
+            <div class="stat-item">Макс: <span class="stat-value" id="tempMax">-</span></div>
+        </div>
+        
+        <h2>Влажность (%)</h2>
+        <div class="chart-container">
+            <canvas id="humChart"></canvas>
+        </div>
+        <div class="stats" id="humStats">
+            <div class="stat-item">Средняя: <span class="stat-value" id="humAvg">-</span></div>
+            <div class="stat-item">Мин: <span class="stat-value" id="humMin">-</span></div>
+            <div class="stat-item">Макс: <span class="stat-value" id="humMax">-</span></div>
+        </div>
+        
+        <button id="saveBtn">Сохранить настройки</button>
+    </div>
 </body>
 </html>
