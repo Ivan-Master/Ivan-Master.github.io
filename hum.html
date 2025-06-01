@@ -35,6 +35,8 @@
         const displayToggle = document.getElementById('displayToggle');
         const displayStatus = document.getElementById('displayStatus');
         const saveBtn = document.getElementById('saveBtn');
+        const autoSendToggle = document.getElementById('autoSendToggle'); // Новый элемент
+        const autoSendStatus = document.getElementById('autoSendStatus'); // Новый элемент
 
         // Поля для настроек
         const maxHumInput = document.getElementById('maxHum');
@@ -91,6 +93,13 @@
 
                     // Загрузка данных температуры
                     loadSensorData('TempValue', lastTempIdx, 'temp', 'tempChart', 'Температура', '#ff6384');
+                });
+
+                const autoSendRef = ref(db, 'System/AutoSend');
+                onValue(autoSendRef, (snapshot) => {
+                    const value = snapshot.val();
+                    autoSendToggle.checked = value === true;
+                    autoSendStatus.textContent = `Автоотправка: ${value ? 'ВКЛ' : 'ВЫКЛ'}`;
                 });
 
             } catch (error) {
@@ -241,6 +250,7 @@
             // Собираем данные для отправки
             const settings = {
                 displayState: displayState,
+                autoSend: autoSendToggle.checked,
                 maxHum: `mh${maxHumInput.value}`,
                 minHum: `mih${minHumInput.value}`,
                 maxTemp: `mt${maxTempInput.value}`,
@@ -402,6 +412,12 @@
         .form-row .form-group {
             flex: 1;
         }
+        .auto-send-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -466,6 +482,15 @@
                         <span class="slider"></span>
                     </label>
                     <span id="displayStatus">Состояние: загрузка...</span>
+                </div>
+            </div>
+            <div class="auto-send-container">
+                <div class="switch-container">
+                    <label class="switch">
+                        <input type="checkbox" id="autoSendToggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="autoSendStatus">Автоотправка: загрузка...</span>
                 </div>
             </div>
         </div>
