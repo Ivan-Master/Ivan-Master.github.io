@@ -98,7 +98,7 @@
                 const autoSendRef = ref(db, 'System/AutoSend');
                 onValue(autoSendRef, (snapshot) => {
                     const value = snapshot.val();
-                    autoSendToggle.checked = value === true;
+                    autoSendToggle.checked = value === 1;
                     autoSendStatus.textContent = `Автоотправка: ${value ? 'ВКЛ' : 'ВЫКЛ'}`;
                 });
 
