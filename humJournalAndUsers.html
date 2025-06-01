@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Журнал событий и управление</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB0ffMd9P4tYw-KVHM1_sMsqIglL-z6DFs",
+            authDomain: "humidity-master.firebaseapp.com",
+            databaseURL: "https://humidity-master-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "humidity-master",
+            storageBucket: "humidity-master.firebasestorage.app",
+            messagingSenderId: "593384546021",
+            appId: "1:593384546021:web:eea456e0824424af6a7e0c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const webApp = Telegram.WebApp;
+        webApp.ready();
+        webApp.expand();
+
+        // Элементы DOM
+        const autoSendToggle = document.getElementById('autoSendToggle');
+        const autoSendStatus = document.getElementById('autoSendStatus');
+        const eventsContainer = document.getElementById('eventsContainer');
+        const usersContainer = document.getElementById('usersContainer');
+        const saveBtn = document.getElementById('saveBtn');
+
+        let autoSendState = false;
+        let usersToDelete = [];
+        let lastJI = 0;
+
+        // Загрузка данных
+        async function loadData() {
+            try {
+                // Загрузка состояния автоотправки
+                const autoSendRef = ref(db, 'AutoSend');
+                onValue(autoSendRef, (snapshot) => {
+                    autoSendState = snapshot.val() || false;
+                    autoSendToggle.checked = autoSendState;
+                    autoSendStatus.textContent = `Автоотправка: ${autoSendState ? 'ВКЛ' : 'ВЫКЛ'}`;
+                });
+
+                // Загрузка последнего индекса журнала
+                const listIdRef = ref(db, 'ListId/JI');
+                onValue(listIdRef, (snapshot) => {
+                    lastJI = snapshot.val() || 0;
+                    loadJournal();
+                });
+
+                // Загрузка пользователей
+                const usersRef = ref(db, 'Users');
+                onValue(usersRef, (snapshot) => {
+                    renderUsers(snapshot.val());
+                });
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                eventsContainer.innerHTML = '<p>Ошибка загрузки данных</p>';
+            }
+        }
+
+        // Загрузка журнала событий
+        async function loadJournal() {
+            try {
+                eventsContainer.innerHTML = '<p>Загрузка журнала...</p>';
+                
+                const journalRef = ref(db, 'Journal');
+                const snapshot = await get(journalRef);
+                const allEvents = snapshot.val() || {};
+                
+                // Получаем ключи и сортируем по убыванию
+                const keys = Object.keys(allEvents).filter(key => !isNaN(key));
+                keys.sort((a, b) => b - a);
+                
+                // Берем последние 10 записей
+                const recentKeys = keys.slice(0, 10);
+                const eventsHtml = recentKeys.map(key => {
+                    const event = allEvents[key];
+                    return `
+                        <div class="event-item">
+                            <div class="event-time">${event.time || ''}</div>
+                            <div class="event-comment">${event.comment || ''}</div>
+                        </div>
+                    `;
+                }).join('');
+                
+                eventsContainer.innerHTML = `
+                    <h2>Журнал событий</h2>
+                    <div class="events-list">${eventsHtml}</div>
+                `;
+                
+            } catch (error) {
+                console.error('Error loading journal:', error);
+                eventsContainer.innerHTML = '<p>Ошибка загрузки журнала</p>';
+            }
+        }
+
+        // Отображение пользователей
+        function renderUsers(users) {
+            if (!users) {
+                usersContainer.innerHTML = '<p>Пользователи не найдены</p>';
+                return;
+            }
+            
+            const usersHtml = Object.keys(users).map(login => `
+                <div class="user-item">
+                    <span>${login}</span>
+                    <button class="delete-user" data-login="${login}">Удалить</button>
+                </div>
+            `).join('');
+            
+            usersContainer.innerHTML = `
+                <h2>Пользователи</h2>
+                <div class="users-list">${usersHtml}</div>
+            `;
+            
+            // Добавляем обработчики удаления
+            document.querySelectorAll('.delete-user').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const login = e.target.dataset.login;
+                    if (!usersToDelete.includes(login)) {
+                        usersToDelete.push(login);
+                        e.target.textContent = 'Удаление...';
+                        e.target.disabled = true;
+                    }
+                });
+            });
+        }
+
+        // Обработчики событий
+        autoSendToggle.addEventListener('change', () => {
+            autoSendState = autoSendToggle.checked;
+            autoSendStatus.textContent = `Автоотправка: ${autoSendState ? 'ВКЛ' : 'ВЫКЛ'}`;
+        });
+
+        saveBtn.addEventListener('click', () => {
+            const data = {
+                autoSend: autoSendState,
+                usersToDelete: usersToDelete
+            };
+            
+            webApp.sendData(JSON.stringify(data));
+            webApp.close();
+        });
+
+        // Инициализация
+        loadData();
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .switch-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-right: 15px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .event-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .event-time {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .event-comment {
+            margin-top: 5px;
+        }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .delete-user {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .delete-user:hover {
+            background: #c82333;
+        }
+        button#saveBtn {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button#saveBtn:hover {
+            background: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Управление системой</h1>
+        
+        <div class="section">
+            <h2>Автоотправка событий</h2>
+            <div class="switch-container">
+                <label class="switch">
+                    <input type="checkbox" id="autoSendToggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="autoSendStatus">Загрузка...</span>
+            </div>
+        </div>
+        
+        <div class="section" id="eventsContainer">
+            <p>Загрузка журнала событий...</p>
+        </div>
+        
+        <div class="section" id="usersContainer">
+            <p>Загрузка пользователей...</p>
+        </div>
+        
+        <button id="saveBtn">Сохранить изменения</button>
+    </div>
+</body>
+</html>
