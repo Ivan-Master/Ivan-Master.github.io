@@ -121,16 +121,37 @@
                 const min = Math.min(...values);
                 const max = Math.max(...values);
                 const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                
+                // Получение последней записи
+                const lastRecord = data.length > 0 ? data[data.length - 1] : null;
 
                 // Обновление статистики
                 if (valueKey === 'temp') {
                     document.getElementById('tempMin').textContent = min.toFixed(1);
                     document.getElementById('tempMax').textContent = max.toFixed(1);
                     document.getElementById('tempAvg').textContent = avg.toFixed(1);
+                    
+                    // Обновление последних данных для температуры
+                    if (lastRecord) {
+                        document.getElementById('lastTempValue').textContent = lastRecord.value.toFixed(1);
+                        document.getElementById('lastTempTime').textContent = lastRecord.time;
+                    } else {
+                        document.getElementById('lastTempValue').textContent = '-';
+                        document.getElementById('lastTempTime').textContent = '-';
+                    }
                 } else {
                     document.getElementById('humMin').textContent = min.toFixed(1);
                     document.getElementById('humMax').textContent = max.toFixed(1);
                     document.getElementById('humAvg').textContent = avg.toFixed(1);
+                    
+                    // Обновление последних данных для влажности
+                    if (lastRecord) {
+                        document.getElementById('lastHumValue').textContent = lastRecord.value.toFixed(1);
+                        document.getElementById('lastHumTime').textContent = lastRecord.time;
+                    } else {
+                        document.getElementById('lastHumValue').textContent = '-';
+                        document.getElementById('lastHumTime').textContent = '-';
+                    }
                 }
 
                 // Отрисовка графика
@@ -402,6 +423,27 @@
         .form-row .form-group {
             flex: 1;
         }
+        /* Стили для последних данных */
+        .last-data {
+            background: #e9f7ef;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .last-data h3 {
+            margin: 0 0 5px 0;
+            color: #28a745;
+            font-size: 16px;
+        }
+        .last-data div {
+            display: flex;
+            justify-content: space-between;
+        }
+        .last-data span {
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -409,6 +451,18 @@
         <h1>Мониторинг параметров</h1>
 
         <h2>Температура (°C)</h2>
+        
+        <!-- Блок последних данных температуры -->
+        <div class="last-data">
+            <h3>Последние актуальные данные</h3>
+            <div>
+                <span>Текущая температура:</span>
+                <span id="lastTempValue">-</span>°C
+                <span>время:</span>
+                <span id="lastTempTime">-</span>
+            </div>
+        </div>
+        
         <div class="chart-container">
             <canvas id="tempChart"></canvas>
         </div>
@@ -419,6 +473,18 @@
         </div>
 
         <h2>Влажность (%)</h2>
+        
+        <!-- Блок последних данных влажности -->
+        <div class="last-data">
+            <h3>Последние актуальные данные</h3>
+            <div>
+                <span>Текущая влажность:</span>
+                <span id="lastHumValue">-</span>%
+                <span>время:</span>
+                <span id="lastHumTime">-</span>
+            </div>
+        </div>
+        
         <div class="chart-container">
             <canvas id="humChart"></canvas>
         </div>
