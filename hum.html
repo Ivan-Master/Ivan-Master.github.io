@@ -431,19 +431,17 @@
             margin: 10px 0;
             border-radius: 4px;
             font-size: 14px;
+            text-align: left;
         }
         .last-data h3 {
-            margin: 0 0 5px 0;
+            margin: 0 0 10px 0;
             color: #28a745;
             font-size: 16px;
         }
         .last-data div {
-            display: flex;
-            justify-content: space-between;
+            margin-bottom: 5px;
         }
-        .last-data span {
-            font-weight: bold;
-        }
+
     </style>
 </head>
 <body>
@@ -454,12 +452,13 @@
         
         <!-- Блок последних данных температуры -->
         <div class="last-data">
+        <div class="last-data">
             <h3>Последние актуальные данные</h3>
             <div>
-                <span>Текущая температура:</span>
-                <span id="lastTempValue">-</span>°C
-                <span>время:</span>
-                <span id="lastTempTime">-</span>
+                <span>Текущая температура: <span id="lastTempValue">-</span>°C</span>
+            </div>
+            <div>
+                <span>Время: <span id="lastTempTime">-</span></span>
             </div>
         </div>
         
@@ -478,12 +477,13 @@
         <div class="last-data">
             <h3>Последние актуальные данные</h3>
             <div>
-                <span>Текущая влажность:</span>
-                <span id="lastHumValue">-</span>%
-                <span>время:</span>
-                <span id="lastHumTime">-</span>
+                <span>Текущая влажность: <span id="lastHumValue">-</span>%</span>
+            </div>
+            <div>
+                <span>Время: <span id="lastHumTime">-</span></span>
             </div>
         </div>
+
         
         <div class="chart-container">
             <canvas id="humChart"></canvas>
